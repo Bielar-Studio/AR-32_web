@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AR-32 | Centro de control</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10141c;
+      --panel: #1a2230;
+      --panel2: #222d3d;
+      --text: #e8eef7;
+      --muted: #9caec3;
+      --accent: #63d5ff;
+      --green: #65e6a3;
+      --red: #ff7777;
+      --border: #344257;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    main {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    header { margin-bottom: 22px; }
+    h1 { margin-bottom: 5px; color: var(--accent); }
+    h2 { font-size: 1.1rem; margin-top: 0; }
+    p { color: var(--muted); line-height: 1.5; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #788397;
+      display: inline-block;
+    }
+
+    .dot.online { background: var(--green); }
+    .dot.offline { background: var(--red); }
+
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      color: var(--muted);
+    }
+
+    input[type="text"],
+    input[type="url"] {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0d121a;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    button {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: .95rem;
+    }
+
+    button:hover { border-color: var(--accent); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .primary {
+      background: #12435b;
+      border-color: #28799b;
+    }
+
+    .danger { border-color: #874747; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .row input[type="text"] {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .check {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      margin: 12px 0;
+      color: var(--text);
+    }
+
+    .check input {
+      width: 18px;
+      height: 18px;
+    }
+
+    .screen {
+      min-height: 76px;
+      padding: 14px;
+      background: #0b1017;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    #log {
+      height: 180px;
+      overflow-y: auto;
+      background: #0b1017;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, monospace;
+      font-size: .85rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    #conversationHistory {
+      max-height: 360px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-message {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      max-width: 90%;
+    }
+
+    .chat-message.user {
+      background: #12435b;
+      align-self: flex-end;
+    }
+
+    .chat-message.assistant {
+      background: var(--panel2);
+      align-self: flex-start;
+    }
+
+    .chat-meta {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: .88rem;
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 12px; }
+      .panel { padding: 14px; }
+
+      .row input[type="text"] {
+        min-width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<main>
+  <header>
+    <h1>AR-32 <span class="muted">/ Centro de control</span></h1>
+    <p>
+      Primero que funcione, después que sea inteligente.
+      El celular escucha y habla; la ESP32 mantiene su trabajo.
+    </p>
+  </header>
+
+  <section class="panel">
+    <h2>Conexiones</h2>
+
+    <label for="espUrl">Dirección del ESP32</label>
+    <input id="espUrl" type="url"
+      value="http://192.168.0.6:8080"
+      placeholder="http://192.168.0.6:8080">
+
+    <label for="macUrl">Servidor Node.js de la Mac</label>
+    <input id="macUrl" type="url"
+      placeholder="http://IP-DE-TU-MAC:3000">
+
+    <div class="row" style="margin-top:12px">
+      <button id="saveUrls" class="primary">Guardar direcciones</button>
+      <button id="checkConnections">Comprobar conexiones</button>
+    </div>
+
+    <p class="muted">
+      Actualmente, para conectar directamente con el ESP32,
+      el navegador debe poder acceder a su red.
+      La versión en la nube se implementará después.
+    </p>
+
+    <div class="status">
+      <span id="espDot" class="dot"></span>
+      <span>ESP32: <strong id="espStatus">Sin comprobar</strong></span>
+    </div>
+
+    <div class="status" style="margin-top:10px">
+      <span id="macDot" class="dot"></span>
+      <span>Mac: <strong id="macStatus">Sin comprobar</strong></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Voz de AR-32</h2>
+
+    <label class="check">
+      <input id="voice" type="checkbox" checked>
+      Leer respuestas en voz alta
+    </label>
+
+    <div class="row">
+      <button id="listen" class="primary">Empezar a escuchar</button>
+      <button id="stopListening">Detener escucha</button>
+      <button id="testVoice">Probar voz</button>
+    </div>
+
+    <p id="listeningStatus" class="muted">Micrófono detenido.</p>
+
+    <label>Lo que escuchó</label>
+    <div id="heard" class="screen">Esperando voz...</div>
+
+    <label>Respuesta de AR-32</label>
+    <div id="reply" class="screen">Sistema preparado.</div>
+
+    <p class="muted">
+      Los comandos de voz pasan por Node.js.
+      Los mensajes que no coinciden con un comando se envían al ESP32.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Hablar con AR-32 por texto</h2>
+
+    <form id="textForm">
+      <div class="row">
+        <input id="message" type="text" maxlength="500"
+          placeholder="Escribe algo para AR-32..."
+          autocomplete="off" required>
+        <button type="submit" class="primary">Enviar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h2>Historial de conversación</h2>
+      <button id="clearHistory" class="danger">Borrar historial</button>
+    </div>
+
+    <p class="muted">
+      Historial local de este navegador. Máximo 200 mensajes.
+    </p>
+
+    <div id="conversationHistory" aria-live="polite"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Control de la Mac</h2>
+    <p>
+      Estos botones envían órdenes al servidor Node.js.
+      Comprueba qué aplicación está activa antes de ejecutar una acción.
+    </p>
+
+    <div class="grid">
+      <button data-cmd="CMD_SAVE">Guardar archivo</button>
+      <button data-cmd="CMD_COMPILE">Compilar / recargar</button>
+      <button data-cmd="CMD_RUN_GAME">Ejecutar proyecto</button>
+      <button data-cmd="CMD_STOP" class="danger">Detener</button>
+      <button data-cmd="CMD_LIVE_SERVER">Live Server</button>
+      <button data-cmd="CMD_RUN_NODE">Ejecutar Node.js</button>
+      <button data-cmd="CMD_SERIAL_MONITOR">Monitor serial</button>
+      <button data-cmd="CMD_TERMINAL">Abrir Terminal</button>
+      <button data-cmd="CMD_GIT_STATUS">Estado de Git</button>
+      <button data-cmd="CMD_GIT_PUSH" class="danger">Git Push</button>
+    </div>
+
+    <p class="muted">
+      Git Push publica los cambios configurados en el repositorio remoto.
+      Revisa lo que vas a publicar antes de ejecutarlo.
+    </p>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h2>Registro del sistema</h2>
+      <button id="clearLog">Limpiar registro</button>
+    </div>
+    <div id="log" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  const HISTORY_KEY = "ar32_conversation_history";
+  const MAX_HISTORY = 200;
+  const URL_KEY = "ar32_connection_urls";
+  const REQUEST_TIMEOUT = 12000;
+
+  let conversation = [];
+  let recognition = null;
+  let listening = false;
+  let lastTts = "";
+  let statusBusy = false;
+  let ttsBusy = false;
+  let sendingText = false;
+  let speaking = false;
+
+  // ======================== HISTORIAL ========================
+
+  try {
+    const saved = localStorage.getItem(HISTORY_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+
+    if (Array.isArray(parsed)) {
+      conversation = parsed
+        .filter(item =>
+          item &&
+          (item.role === "user" || item.role === "assistant") &&
+          typeof item.text === "string"
+        )
+        .slice(-MAX_HISTORY);
+    }
+  } catch (_) {
+    conversation = [];
+  }
+
+  function renderConversation() {
+    const container = $("conversationHistory");
+    container.replaceChildren();
+
+    if (conversation.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Todavía no hay conversaciones.";
+      container.appendChild(empty);
+      return;
+    }
+
+    conversation.forEach(item => {
+      const bubble = document.createElement("div");
+      bubble.className = "chat-message " + item.role;
+
+      const meta = document.createElement("span");
+      meta.className = "chat-meta";
+
+      const date = new Date(item.time);
+      const validDate = !Number.isNaN(date.getTime());
+
+      meta.textContent =
+        (item.role === "user" ? "Tú" : "AR-32") +
+        " · " +
+        (validDate ? date.toLocaleString() : "");
+
+      const content = document.createElement("div");
+      content.textContent = item.text;
+
+      bubble.append(meta, content);
+      container.appendChild(bubble);
+    });
+
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function saveConversation() {
+    try {
+      localStorage.setItem(
+        HISTORY_KEY,
+        JSON.stringify(conversation)
+      );
+    } catch (error) {
+      log("No se pudo guardar el historial en este navegador.");
+    }
+  }
+
+  function addConversationMessage(role, text) {
+    text = String(text || "").trim();
+    if (!text) return;
+
+    const last = conversation[conversation.length - 1];
+
+    // Evita duplicar mensajes idénticos consecutivos.
+    if (last && last.role === role && last.text === text) {
+      return;
+    }
+
+    conversation.push({
+      role,
+      text,
+      time: Date.now()
+    });
+
+    conversation = conversation.slice(-MAX_HISTORY);
+
+    saveConversation();
+    renderConversation();
+  }
+
+  renderConversation();
+
+  // ======================== DIRECCIONES ========================
+
+  function normalizeBase(value) {
+    return value.trim().replace(/\/+$/, "");
+  }
+
+  function url(id) {
+    const value = normalizeBase($(id).value);
+
+    if (!value) {
+      throw new Error("Falta configurar la dirección: " + id);
+    }
+
+    return value;
+  }
+
+  function loadUrls() {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(URL_KEY) || "{}"
+      );
+
+      if (saved.espUrl) $("espUrl").value = saved.espUrl;
+
+      if (typeof saved.macUrl === "string") {
+        $("macUrl").value = saved.macUrl;
+      } else {
+        $("macUrl").value =
+          location.protocol.startsWith("http")
+            ? location.origin
+            : "";
+      }
+    } catch (_) {
+      $("macUrl").value =
+        location.protocol.startsWith("http")
+          ? location.origin
+          : "";
+    }
+  }
+
+  $("saveUrls").addEventListener("click", () => {
+    try {
+      const espUrl = url("espUrl");
+      const macUrl = normalizeBase($("macUrl").value);
+
+      localStorage.setItem(
+        URL_KEY,
+        JSON.stringify({ espUrl, macUrl })
+      );
+
+      log("Direcciones guardadas en este navegador.");
+      checkConnections();
+    } catch (error) {
+      log("Error guardando direcciones: " + error.message);
+    }
+  });
+
+  loadUrls();
+
+  // ======================== REGISTRO ========================
+
+  function log(message) {
+    const time = new Date().toLocaleTimeString();
+    $("log").textContent += `[${time}] ${message}\n`;
+    $("log").scrollTop = $("log").scrollHeight;
+  }
+
+  // ======================== PETICIONES HTTP ========================
+
+  async function api(base, path, options = {}) {
+    const controller = new AbortController();
+
+    const timeout = setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT
+    );
+
+    try {
+      return await fetch(base + path, {
+        ...options,
+        signal: controller.signal,
+        cache: "no-store"
+      });
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("Tiempo de espera agotado: " + path);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async function readResponse(response) {
+    const contentType =
+      response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      return response.json();
+    }
+
+    const text = await response.text();
+
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      return text;
+    }
+  }
+
+  function extractText(data) {
+    if (typeof data === "string") return data.trim();
+
+    if (!data || typeof data !== "object") return "";
+
+    const value =
+      data.text ??
+      data.tts ??
+      data.message ??
+      data.response ??
+      data.reply ??
+      data.answer ??
+      "";
+
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  // ======================== ESTADOS ========================
+
+  function setStatus(which, online, message) {
+    $(which + "Status").textContent = message;
+
+    $(which + "Dot").className =
+      "dot " + (online ? "online" : "offline");
+  }
+
+  // ======================== VOZ SINTETIZADA ========================
+
+  function speak(text) {
+    if (
+      !("speechSynthesis" in window) ||
+      !$("voice").checked
+    ) {
+      return;
+    }
+
+    text = String(text || "").trim();
+    if (!text) return;
+
+    const synth = window.speechSynthesis;
+    const voices = synth.getVoices();
+
+    const voice =
+      voices.find(v => v.name === "Juan") ||
+      voices.find(v => v.lang === "es-MX") ||
+      voices.find(v => v.lang === "es-ES") ||
+      voices.find(v => v.lang.startsWith("es"));
+
+    synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = "es-MX";
+    }
+
+    utterance.rate = 0.92;
+    utterance.pitch = 1.25;
+
+    utterance.onstart = () => {
+      speaking = true;
+    };
+
+    utterance.onend = () => {
+      speaking = false;
+    };
+
+    utterance.onerror = () => {
+      speaking = false;
+      log("El navegador no pudo reproducir la voz.");
+    };
+
+    synth.speak(utterance);
+  }
+
+  function showReply(text, shouldSpeak = true) {
+    text = String(text || "").trim();
+    if (!text) return;
+
+    $("reply").textContent = text;
+
+    if (shouldSpeak) speak(text);
+  }
+
+  // ======================== CHAT CON ESP32 ========================
+
+  async function sendText(text) {
+    text = String(text || "").trim();
+
+    if (!text || sendingText) return;
+
+    sendingText = true;
+
+    $("heard").textContent = text;
+    $("reply").textContent = "Enviando mensaje a AR-32...";
+
+    addConversationMessage("user", text);
+
+    try {
+      const response = await api(url("espUrl"), "/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await readResponse(response);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          data?.message ||
+          "HTTP " + response.status
+        );
+      }
+
+      const reply = extractText(data);
+
+      if (
+        reply &&
+        !/^(ok|accepted|mensaje recibido|texto recibido)$/i.test(reply)
+      ) {
+        showReply(reply);
+        addConversationMessage("assistant", reply);
+      } else {
+        $("reply").textContent =
+          "Mensaje recibido por el ESP32. Esperando respuesta de AR-32...";
+      }
+
+      log("Mensaje enviado al ESP32.");
+    } catch (error) {
+      $("reply").textContent =
+        "No se pudo enviar el mensaje al ESP32.";
+
+      log("Error enviando texto: " + error.message);
+    } finally {
+      sendingText = false;
+    }
+  }
+
+  // ======================== COMANDOS DE VOZ ========================
+
+  async function routeVoiceText(text) {
+    text = String(text || "").trim();
+    if (!text) return;
+
+    $("heard").textContent = text;
+
+    try {
+      const response = await api(url("macUrl"), "/voz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await readResponse(response);
+
+      if (data && typeof data === "object" && data.matched) {
+        const message =
+          data.message ||
+          data.error ||
+          (response.ok
+            ? "Orden enviada."
+            : "No se pudo ejecutar la orden.");
+
+        showReply(message);
+
+        if (!response.ok) {
+          log("Comando rechazado o fallido: " + message);
+        } else {
+          log("Comando de voz enviado: " + (data.command || "Mac"));
+        }
+
+        return;
+      }
+
+      if (response.ok) {
+        log("No era un comando de Mac; enviando texto al ESP32.");
+        await sendText(text);
+        return;
+      }
+
+      throw new Error(
+        "Servidor Mac respondió HTTP " + response.status
+      );
+    } catch (error) {
+      log("No se pudo consultar /voz: " + error.message);
+      log("Intentando enviar el mensaje directamente al ESP32.");
+
+      await sendText(text);
+    }
+  }
+
+  // ======================== RECONOCIMIENTO DE VOZ ========================
+
+  function setupRecognition() {
+    const SpeechRecognition =
+      window.SpeechRecognition ||
+      window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      $("listen").disabled = true;
+
+      $("listeningStatus").textContent =
+        "Reconocimiento de voz no disponible en este navegador.";
+
+      log("Reconocimiento de voz no disponible.");
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = "es-SV";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      listening = true;
+      $("listeningStatus").textContent = "Escuchando...";
+      $("listen").disabled = true;
+      $("stopListening").disabled = false;
+
+      log("Micrófono activado.");
+    };
+
+    recognition.onresult = event => {
+      const result = event.results[event.results.length - 1];
+
+      if (!result || !result.isFinal) return;
+
+      const text = result[0].transcript.trim();
+
+      if (text) routeVoiceText(text);
+    };
+
+    recognition.onerror = event => {
+      $("listeningStatus").textContent =
+        "Error del micrófono: " + event.error;
+
+      log("Error de voz: " + event.error);
+    };
+
+    recognition.onend = () => {
+      listening = false;
+      $("listen").disabled = false;
+      $("listeningStatus").textContent = "Micrófono detenido.";
+    };
+  }
+
+  function startListening() {
+    if (!recognition) setupRecognition();
+
+    if (!recognition || listening) return;
+
+    try {
+      recognition.start();
+    } catch (error) {
+      log("No se pudo iniciar el micrófono: " + error.message);
+    }
+  }
+
+  function stopListening() {
+    if (recognition && listening) {
+      recognition.stop();
+    }
+
+    listening = false;
+
+    $("listeningStatus").textContent = "Micrófono detenido.";
+    $("listen").disabled = false;
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  // ======================== CONTROL DE MAC ========================
+
+  async function sendCommand(command, button) {
+    button.disabled = true;
+
+    try {
+      const response = await api(url("macUrl"), "/evento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cmd: command })
+      });
+
+      const data = await readResponse(response);
+
+      if (!response.ok || (data && data.ok === false)) {
+        throw new Error(
+          data?.error ||
+          data?.message ||
+          "HTTP " + response.status
+        );
+      }
+
+      const message =
+        data?.message || "Orden enviada: " + command;
+
+      showReply(message);
+      log(message);
+    } catch (error) {
+      log("Error con " + command + ": " + error.message);
+
+      showReply(
+        "No se pudo ejecutar el comando: " + error.message,
+        false
+      );
+    } finally {
+      setTimeout(() => {
+        button.disabled = false;
+      }, 1000);
+    }
+  }
+
+  // ======================== CONEXIONES ========================
+
+  async function checkConnections() {
+    if (statusBusy) return;
+
+    statusBusy = true;
+
+    try {
+      try {
+        const response = await api(url("espUrl"), "/status");
+
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        const data = await readResponse(response);
+
+        setStatus("esp", true, data?.status || "En línea");
+
+        if (data?.trigger_escucha === true) {
+          log("Proximidad detectada. Activando escucha web...");
+          startListening();
+        }
+      } catch (error) {
+        setStatus("esp", false, "Error de conexión");
+
+        log("Error consultando /status: " + error.message);
+      }
+
+      try {
+        const response = await api(url("macUrl"), "/health");
+
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        setStatus("mac", true, "En línea");
+      } catch (error) {
+        setStatus("mac", false, "Sin conexión");
+
+        log("Error consultando /health: " + error.message);
+      }
+    } finally {
+      statusBusy = false;
+    }
+  }
+
+  // ======================== RESPUESTAS DE AR-32 ========================
+
+  async function pollTts() {
+    if (ttsBusy || document.hidden) return;
+
+    ttsBusy = true;
+
+    try {
+      const response = await api(url("espUrl"), "/tts");
+
+      if (response.status === 204) return;
+
+      if (!response.ok) {
+        log("Error en /tts: HTTP " + response.status);
+        return;
+      }
+
+      const data = await readResponse(response);
+      const text = extractText(data);
+
+      if (!text) return;
+
+      if (text === lastTts) return;
+
+      lastTts = text;
+
+      showReply(text);
+      addConversationMessage("assistant", text);
+
+      log("Respuesta recibida del ESP32.");
+    } catch (error) {
+      log("Error consultando /tts: " + error.message);
+    } finally {
+      ttsBusy = false;
+    }
+  }
+
+  // ======================== EVENTOS ========================
+
+  $("checkConnections").addEventListener(
+    "click",
+    checkConnections
+  );
+
+  $("listen").addEventListener("click", startListening);
+  $("stopListening").addEventListener("click", stopListening);
+
+  $("testVoice").addEventListener("click", () => {
+    showReply(
+      "Prueba de voz. Sistemas en línea. Esperando instrucciones, creador.",
+      true
+    );
+  });
+
+  $("textForm").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const text = $("message").value.trim();
+
+    if (!text) return;
+
+    $("message").value = "";
+
+    await sendText(text);
+  });
+
+  document.querySelectorAll("[data-cmd]").forEach(button => {
+    button.addEventListener("click", () => {
+      sendCommand(button.dataset.cmd, button);
+    });
+  });
+
+  $("clearLog").addEventListener("click", () => {
+    $("log").textContent = "";
+  });
+
+  $("clearHistory").addEventListener("click", () => {
+    if (!confirm("¿Borrar todo el historial de conversación?")) {
+      return;
+    }
+
+    conversation = [];
+
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch (_) {
+      log("No se pudo borrar el historial guardado.");
+    }
+
+    renderConversation();
+    log("Historial de conversación borrado.");
+  });
+
+  $("voice").addEventListener("change", () => {
+    if (
+      !$("voice").checked &&
+      "speechSynthesis" in window
+    ) {
+      window.speechSynthesis.cancel();
+    }
+  });
+
+  // ======================== INICIO ========================
+
+  setupRecognition();
+  checkConnections();
+
+  setInterval(checkConnections, 5000);
+  setInterval(pollTts, 2000);
+
+  log("Centro de control AR-32 iniciado.");
+})();
+</script>
+</body>
+</html>
+
+ 
+
+
