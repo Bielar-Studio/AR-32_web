@@ -340,22 +340,22 @@
 </main>
 
 <script>
+
 (() => {
   "use strict";
 
   const $ = id => document.getElementById(id);
 
+  const CLOUD = "https://ar-32-cloud.onrender.com";
   const HISTORY_KEY = "ar32_conversation_history";
-  const MAX_HISTORY = 200;
   const URL_KEY = "ar32_connection_urls";
+  const MAX_HISTORY = 200;
   const REQUEST_TIMEOUT = 12000;
 
   let conversation = [];
   let recognition = null;
   let listening = false;
-  let lastTts = "";
   let statusBusy = false;
-  let ttsBusy = false;
   let sendingText = false;
   let speaking = false;
 
@@ -382,7 +382,7 @@
     const container = $("conversationHistory");
     container.replaceChildren();
 
-    if (conversation.length === 0) {
+    if (!conversation.length) {
       const empty = document.createElement("p");
       empty.className = "muted";
       empty.textContent = "Todavía no hay conversaciones.";
@@ -398,12 +398,10 @@
       meta.className = "chat-meta";
 
       const date = new Date(item.time);
-      const validDate = !Number.isNaN(date.getTime());
-
       meta.textContent =
         (item.role === "user" ? "Tú" : "AR-32") +
         " · " +
-        (validDate ? date.toLocaleString() : "");
+        (Number.isNaN(date.getTime()) ? "" : date.toLocaleString());
 
       const content = document.createElement("div");
       content.textContent = item.text;
@@ -421,8 +419,8 @@
         HISTORY_KEY,
         JSON.stringify(conversation)
       );
-    } catch (error) {
-      log("No se pudo guardar el historial en este navegador.");
+    } catch (_) {
+      log("No se pudo guardar el historial.");
     }
   }
 
@@ -432,17 +430,9 @@
 
     const last = conversation[conversation.length - 1];
 
-    // Evita duplicar mensajes idénticos consecutivos.
-    if (last && last.role === role && last.text === text) {
-      return;
-    }
+    if (last && last.role === role && last.text === text) return;
 
-    conversation.push({
-      role,
-      text,
-      time: Date.now()
-    });
-
+    conversation.push({ role, text, time: Date.now() });
     conversation = conversation.slice(-MAX_HISTORY);
 
     saveConversation();
@@ -454,17 +444,11 @@
   // ======================== DIRECCIONES ========================
 
   function normalizeBase(value) {
-    return value.trim().replace(/\/+$/, "");
+    return String(value || "").trim().replace(/\/+$/, "");
   }
 
-  function url(id) {
-    const value = normalizeBase($(id).value);
-
-    if (!value) {
-      throw new Error("Falta configurar la dirección: " + id);
-    }
-
-    return value;
+  function macBase() {
+    return normalizeBase($("macUrl").value);
   }
 
   function loadUrls() {
@@ -473,35 +457,27 @@
         localStorage.getItem(URL_KEY) || "{}"
       );
 
-      if (saved.espUrl) $("espUrl").value = saved.espUrl;
-
-      if (typeof saved.macUrl === "string") {
-        $("macUrl").value = saved.macUrl;
-      } else {
-        $("macUrl").value =
-          location.protocol.startsWith("http")
-            ? location.origin
-            : "";
+      if (saved.espUrl && $("espUrl")) {
+        $("espUrl").value = saved.espUrl;
       }
+
+      $("macUrl").value = saved.macUrl || "";
     } catch (_) {
-      $("macUrl").value =
-        location.protocol.startsWith("http")
-          ? location.origin
-          : "";
+      $("macUrl").value = "";
     }
   }
 
   $("saveUrls").addEventListener("click", () => {
     try {
-      const espUrl = url("espUrl");
-      const macUrl = normalizeBase($("macUrl").value);
-
       localStorage.setItem(
         URL_KEY,
-        JSON.stringify({ espUrl, macUrl })
+        JSON.stringify({
+          espUrl: $("espUrl")?.value || "",
+          macUrl: macBase()
+        })
       );
 
-      log("Direcciones guardadas en este navegador.");
+      log("Direcciones guardadas.");
       checkConnections();
     } catch (error) {
       log("Error guardando direcciones: " + error.message);
@@ -513,16 +489,15 @@
   // ======================== REGISTRO ========================
 
   function log(message) {
-    const time = new Date().toLocaleTimeString();
-    $("log").textContent += `[${time}] ${message}\n`;
-    $("log").scrollTop = $("log").scrollHeight;
+    const panel = $("log");
+    panel.textContent += `[${new Date().toLocaleTimeString()}] ${message}\n`;
+    panel.scrollTop = panel.scrollHeight;
   }
 
   // ======================== PETICIONES HTTP ========================
 
   async function api(base, path, options = {}) {
     const controller = new AbortController();
-
     const timeout = setTimeout(
       () => controller.abort(),
       REQUEST_TIMEOUT
@@ -538,7 +513,6 @@
       if (error.name === "AbortError") {
         throw new Error("Tiempo de espera agotado: " + path);
       }
-
       throw error;
     } finally {
       clearTimeout(timeout);
@@ -546,10 +520,11 @@
   }
 
   async function readResponse(response) {
-    const contentType =
-      response.headers.get("content-type") || "";
+    if (response.status === 204) return null;
 
-    if (contentType.includes("application/json")) {
+    const type = response.headers.get("content-type") || "";
+
+    if (type.includes("application/json")) {
       return response.json();
     }
 
@@ -564,7 +539,6 @@
 
   function extractText(data) {
     if (typeof data === "string") return data.trim();
-
     if (!data || typeof data !== "object") return "";
 
     const value =
@@ -583,7 +557,6 @@
 
   function setStatus(which, online, message) {
     $(which + "Status").textContent = message;
-
     $(which + "Dot").className =
       "dot " + (online ? "online" : "offline");
   }
@@ -591,12 +564,7 @@
   // ======================== VOZ SINTETIZADA ========================
 
   function speak(text) {
-    if (
-      !("speechSynthesis" in window) ||
-      !$("voice").checked
-    ) {
-      return;
-    }
+    if (!("speechSynthesis" in window) || !$("voice").checked) return;
 
     text = String(text || "").trim();
     if (!text) return;
@@ -606,6 +574,7 @@
 
     const voice =
       voices.find(v => v.name === "Juan") ||
+      voices.find(v => v.lang === "es-SV") ||
       voices.find(v => v.lang === "es-MX") ||
       voices.find(v => v.lang === "es-ES") ||
       voices.find(v => v.lang.startsWith("es"));
@@ -613,25 +582,14 @@
     synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang;
-    } else {
-      utterance.lang = "es-MX";
-    }
-
+    utterance.lang = voice?.lang || "es-SV";
     utterance.rate = 0.92;
     utterance.pitch = 1.25;
 
-    utterance.onstart = () => {
-      speaking = true;
-    };
+    if (voice) utterance.voice = voice;
 
-    utterance.onend = () => {
-      speaking = false;
-    };
-
+    utterance.onstart = () => { speaking = true; };
+    utterance.onend = () => { speaking = false; };
     utterance.onerror = () => {
       speaking = false;
       log("El navegador no pudo reproducir la voz.");
@@ -645,11 +603,46 @@
     if (!text) return;
 
     $("reply").textContent = text;
-
     if (shouldSpeak) speak(text);
   }
 
-  // ======================== CHAT CON ESP32 ========================
+  // ======================== CHAT CON AR-32 EN RENDER ========================
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function waitForReply(id) {
+    const deadline = Date.now() + 180000;
+
+    while (Date.now() < deadline) {
+      await wait(2000);
+
+      const response = await api(
+        CLOUD,
+        "/chat/reply?id=" + encodeURIComponent(id)
+      );
+
+      if (response.status === 204) continue;
+
+      const data = await readResponse(response);
+
+      if (!response.ok) {
+        throw new Error("Error leyendo respuesta: HTTP " + response.status);
+      }
+
+      const reply = extractText(data);
+
+      if (reply) {
+        showReply(reply);
+        addConversationMessage("assistant", reply);
+        log("Respuesta recibida de AR-32.");
+        return;
+      }
+    }
+
+    throw new Error("AR-32 tardó demasiado en responder.");
+  }
 
   async function sendText(text) {
     text = String(text || "").trim();
@@ -657,14 +650,12 @@
     if (!text || sendingText) return;
 
     sendingText = true;
-
     $("heard").textContent = text;
     $("reply").textContent = "Enviando mensaje a AR-32...";
-
     addConversationMessage("user", text);
 
     try {
-      const response = await api(url("espUrl"), "/text", {
+      const response = await api(CLOUD, "/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
@@ -674,31 +665,21 @@
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
-          data?.message ||
-          "HTTP " + response.status
+          data?.error || data?.message || "HTTP " + response.status
         );
       }
 
-      const reply = extractText(data);
-
-      if (
-        reply &&
-        !/^(ok|accepted|mensaje recibido|texto recibido)$/i.test(reply)
-      ) {
-        showReply(reply);
-        addConversationMessage("assistant", reply);
-      } else {
-        $("reply").textContent =
-          "Mensaje recibido por el ESP32. Esperando respuesta de AR-32...";
+      if (!data?.id) {
+        throw new Error("Render no devolvió el identificador del mensaje.");
       }
 
-      log("Mensaje enviado al ESP32.");
-    } catch (error) {
-      $("reply").textContent =
-        "No se pudo enviar el mensaje al ESP32.";
+      $("reply").textContent = "AR-32 está procesando tu mensaje...";
+      log("Mensaje enviado a Render. Esperando al ESP32...");
 
-      log("Error enviando texto: " + error.message);
+      await waitForReply(data.id);
+    } catch (error) {
+      $("reply").textContent = "No se recibió respuesta de AR-32.";
+      log("Error de chat: " + error.message);
     } finally {
       sendingText = false;
     }
@@ -712,49 +693,36 @@
 
     $("heard").textContent = text;
 
-    try {
-      const response = await api(url("macUrl"), "/voz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
-      });
+    // Si hay un servidor Mac configurado, se intenta detectar
+    // un comando local. Si no, el texto va directamente a Render.
+    const mac = macBase();
 
-      const data = await readResponse(response);
+    if (mac) {
+      try {
+        const response = await api(mac, "/voz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
 
-      if (data && typeof data === "object" && data.matched) {
-        const message =
-          data.message ||
-          data.error ||
-          (response.ok
-            ? "Orden enviada."
-            : "No se pudo ejecutar la orden.");
+        const data = await readResponse(response);
 
-        showReply(message);
+        if (data && typeof data === "object" && data.matched) {
+          const message =
+            data.message ||
+            data.error ||
+            (response.ok ? "Orden enviada." : "No se pudo ejecutar.");
 
-        if (!response.ok) {
-          log("Comando rechazado o fallido: " + message);
-        } else {
-          log("Comando de voz enviado: " + (data.command || "Mac"));
+          showReply(message);
+          log(message);
+          return;
         }
-
-        return;
+      } catch (_) {
+        log("Servidor Mac no disponible; usando la nube.");
       }
-
-      if (response.ok) {
-        log("No era un comando de Mac; enviando texto al ESP32.");
-        await sendText(text);
-        return;
-      }
-
-      throw new Error(
-        "Servidor Mac respondió HTTP " + response.status
-      );
-    } catch (error) {
-      log("No se pudo consultar /voz: " + error.message);
-      log("Intentando enviar el mensaje directamente al ESP32.");
-
-      await sendText(text);
     }
+
+    await sendText(text);
   }
 
   // ======================== RECONOCIMIENTO DE VOZ ========================
@@ -766,11 +734,9 @@
 
     if (!SpeechRecognition) {
       $("listen").disabled = true;
-
       $("listeningStatus").textContent =
-        "Reconocimiento de voz no disponible en este navegador.";
-
-      log("Reconocimiento de voz no disponible.");
+        "Reconocimiento de voz no disponible.";
+      log("Reconocimiento de voz no disponible en este navegador.");
       return;
     }
 
@@ -785,37 +751,33 @@
       $("listeningStatus").textContent = "Escuchando...";
       $("listen").disabled = true;
       $("stopListening").disabled = false;
-
       log("Micrófono activado.");
     };
 
     recognition.onresult = event => {
       const result = event.results[event.results.length - 1];
-
-      if (!result || !result.isFinal) return;
-
-      const text = result[0].transcript.trim();
-
-      if (text) routeVoiceText(text);
+      if (result?.isFinal) {
+        const text = result[0].transcript.trim();
+        if (text) routeVoiceText(text);
+      }
     };
 
     recognition.onerror = event => {
       $("listeningStatus").textContent =
         "Error del micrófono: " + event.error;
-
       log("Error de voz: " + event.error);
     };
 
     recognition.onend = () => {
       listening = false;
       $("listen").disabled = false;
+      $("stopListening").disabled = true;
       $("listeningStatus").textContent = "Micrófono detenido.";
     };
   }
 
   function startListening() {
     if (!recognition) setupRecognition();
-
     if (!recognition || listening) return;
 
     try {
@@ -826,12 +788,9 @@
   }
 
   function stopListening() {
-    if (recognition && listening) {
-      recognition.stop();
-    }
+    if (recognition && listening) recognition.stop();
 
     listening = false;
-
     $("listeningStatus").textContent = "Micrófono detenido.";
     $("listen").disabled = false;
 
@@ -840,13 +799,21 @@
     }
   }
 
-  // ======================== CONTROL DE MAC ========================
+  // ======================== COMANDOS OPCIONALES DE MAC ========================
 
   async function sendCommand(command, button) {
+    const mac = macBase();
+
+    if (!mac) {
+      log("Este botón requiere el servidor Mac y una dirección en macUrl.");
+      showReply("Comando local no disponible: no hay servidor Mac configurado.", false);
+      return;
+    }
+
     button.disabled = true;
 
     try {
-      const response = await api(url("macUrl"), "/evento", {
+      const response = await api(mac, "/evento", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cmd: command })
@@ -854,30 +821,20 @@
 
       const data = await readResponse(response);
 
-      if (!response.ok || (data && data.ok === false)) {
+      if (!response.ok || data?.ok === false) {
         throw new Error(
-          data?.error ||
-          data?.message ||
-          "HTTP " + response.status
+          data?.error || data?.message || "HTTP " + response.status
         );
       }
 
-      const message =
-        data?.message || "Orden enviada: " + command;
-
+      const message = data?.message || "Orden enviada: " + command;
       showReply(message);
       log(message);
     } catch (error) {
       log("Error con " + command + ": " + error.message);
-
-      showReply(
-        "No se pudo ejecutar el comando: " + error.message,
-        false
-      );
+      showReply("No se pudo ejecutar el comando: " + error.message, false);
     } finally {
-      setTimeout(() => {
-        button.disabled = false;
-      }, 1000);
+      setTimeout(() => { button.disabled = false; }, 1000);
     }
   }
 
@@ -885,93 +842,44 @@
 
   async function checkConnections() {
     if (statusBusy) return;
-
     statusBusy = true;
 
     try {
-      try {
-        const response = await api(url("espUrl"), "/status");
-
-        if (!response.ok) {
-          throw new Error("HTTP " + response.status);
-        }
-
-        const data = await readResponse(response);
-
-        setStatus("esp", true, data?.status || "En línea");
-
-        if (data?.trigger_escucha === true) {
-          log("Proximidad detectada. Activando escucha web...");
-          startListening();
-        }
-      } catch (error) {
-        setStatus("esp", false, "Error de conexión");
-
-        log("Error consultando /status: " + error.message);
-      }
-
-      try {
-        const response = await api(url("macUrl"), "/health");
-
-        if (!response.ok) {
-          throw new Error("HTTP " + response.status);
-        }
-
-        setStatus("mac", true, "En línea");
-      } catch (error) {
-        setStatus("mac", false, "Sin conexión");
-
-        log("Error consultando /health: " + error.message);
-      }
-    } finally {
-      statusBusy = false;
-    }
-  }
-
-  // ======================== RESPUESTAS DE AR-32 ========================
-
-  async function pollTts() {
-    if (ttsBusy || document.hidden) return;
-
-    ttsBusy = true;
-
-    try {
-      const response = await api(url("espUrl"), "/tts");
-
-      if (response.status === 204) return;
+      const response = await api(CLOUD, "/health");
 
       if (!response.ok) {
-        log("Error en /tts: HTTP " + response.status);
-        return;
+        throw new Error("HTTP " + response.status);
       }
 
       const data = await readResponse(response);
-      const text = extractText(data);
+      setStatus("esp", true, "Nube en línea");
 
-      if (!text) return;
-
-      if (text === lastTts) return;
-
-      lastTts = text;
-
-      showReply(text);
-      addConversationMessage("assistant", text);
-
-      log("Respuesta recibida del ESP32.");
+      // Render no confirma por sí solo que el ESP32 esté conectado.
+      $("espStatus").textContent =
+        "Nube en línea · " + (data?.pending ?? 0) + " pendientes";
     } catch (error) {
-      log("Error consultando /tts: " + error.message);
-    } finally {
-      ttsBusy = false;
+      setStatus("esp", false, "Nube desconectada");
     }
+
+    const mac = macBase();
+
+    if (!mac) {
+      setStatus("mac", false, "Opcional / no configurado");
+    } else {
+      try {
+        const response = await api(mac, "/health");
+        setStatus("mac", response.ok, response.ok ? "En línea" : "Error");
+      } catch (_) {
+        setStatus("mac", false, "Sin conexión");
+      }
+    }
+
+    statusBusy = false;
   }
 
   // ======================== EVENTOS ========================
 
-  $("checkConnections").addEventListener(
-    "click",
-    checkConnections
-  );
-
+  $("checkConnections").addEventListener("click", checkConnections);
   $("listen").addEventListener("click", startListening);
   $("stopListening").addEventListener("click", stopListening);
 
@@ -986,11 +894,9 @@
     event.preventDefault();
 
     const text = $("message").value.trim();
-
     if (!text) return;
 
     $("message").value = "";
-
     await sendText(text);
   });
 
@@ -1005,27 +911,20 @@
   });
 
   $("clearHistory").addEventListener("click", () => {
-    if (!confirm("¿Borrar todo el historial de conversación?")) {
-      return;
-    }
+    if (!confirm("¿Borrar todo el historial de conversación?")) return;
 
     conversation = [];
 
     try {
       localStorage.removeItem(HISTORY_KEY);
-    } catch (_) {
-      log("No se pudo borrar el historial guardado.");
-    }
+    } catch (_) {}
 
     renderConversation();
-    log("Historial de conversación borrado.");
+    log("Historial borrado.");
   });
 
   $("voice").addEventListener("change", () => {
-    if (
-      !$("voice").checked &&
-      "speechSynthesis" in window
-    ) {
+    if (!$("voice").checked && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
   });
@@ -1035,14 +934,15 @@
   setupRecognition();
   checkConnections();
 
-  setInterval(checkConnections, 5000);
-  setInterval(pollTts, 2000);
+  setInterval(checkConnections, 15000);
 
-  log("Centro de control AR-32 iniciado.");
+  log("Dev Link iniciado. Chat conectado a AR-32 Cloud.");
 })();
+
 </script>
 </body>
 </html>
+
 
  
 
