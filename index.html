@@ -304,31 +304,39 @@
     <div id="conversationHistory" aria-live="polite"></div>
   </section>
 
-  <section class="panel">
-    <h2>Control de la Mac</h2>
-    <p>
-      Estos botones envían órdenes al servidor Node.js.
-      Comprueba qué aplicación está activa antes de ejecutar una acción.
-    </p>
+  
+<section class="panel">
+  <h2>Asistente de programación</h2>
+  <p>
+    Atajos de teclado para VS Code y Arduino IDE 2.
+    Abre primero la aplicación y el archivo que quieras controlar.
+  </p>
 
-    <div class="grid">
-      <button data-cmd="CMD_SAVE">Guardar archivo</button>
-      <button data-cmd="CMD_COMPILE">Compilar / recargar</button>
-      <button data-cmd="CMD_RUN_GAME">Ejecutar proyecto</button>
-      <button data-cmd="CMD_STOP" class="danger">Detener</button>
-      <button data-cmd="CMD_LIVE_SERVER">Live Server</button>
-      <button data-cmd="CMD_RUN_NODE">Ejecutar Node.js</button>
-      <button data-cmd="CMD_SERIAL_MONITOR">Monitor serial</button>
-      <button data-cmd="CMD_TERMINAL">Abrir Terminal</button>
-      <button data-cmd="CMD_GIT_STATUS">Estado de Git</button>
-      <button data-cmd="CMD_GIT_PUSH" class="danger">Git Push</button>
-    </div>
+  <h3>VS Code · HTML, CSS y JavaScript</h3>
+  <div class="grid">
+    <button data-cmd="CMD_VSCODE_SAVE">Guardar código</button>
+    <button data-cmd="CMD_VSCODE_FORMAT">Formatear archivo</button>
+    <button data-cmd="CMD_VSCODE_PALETTE">Paleta de comandos</button>
+  </div>
 
-    <p class="muted">
-      Git Push publica los cambios configurados en el repositorio remoto.
-      Revisa lo que vas a publicar antes de ejecutarlo.
-    </p>
-  </section>
+  <h3 style="margin-top:22px">Arduino IDE 2 · ESP32 y Arduino</h3>
+  <div class="grid">
+    <button data-cmd="CMD_ARDUINO_SAVE">Guardar sketch</button>
+    <button data-cmd="CMD_ARDUINO_VERIFY" class="primary">
+      Verificar / compilar
+    </button>
+    <button data-cmd="CMD_ARDUINO_UPLOAD" class="danger">
+      Subir firmware
+    </button>
+    <button data-cmd="CMD_ARDUINO_SERIAL">Monitor serial</button>
+  </div>
+
+  <p class="muted">
+    Las órdenes envían atajos de teclado a la aplicación indicada.
+    Verifica la ventana activa, la placa y el puerto antes de subir firmware.
+  </p>
+</section>
+
 
   <section class="panel">
     <div class="row" style="justify-content:space-between">
@@ -942,7 +950,6 @@
 </script>
 </body>
 </html>
-
 
  
 
